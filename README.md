@@ -1,64 +1,64 @@
 # Claude Browser Agent
 
-Give Claude Code the ability to control a real browser — navigate websites, read feeds, fill forms, click buttons, and post content. Uses Microsoft's Playwright MCP server under the hood.
+Give Claude Code the ability to control a real browser — navigate websites, read feeds, fill forms, click buttons, and post content.
 
 ## How It Works
 
-Claude Code communicates with websites through the **Model Context Protocol (MCP)**. The Playwright MCP server launches a real browser (Edge/Chrome) and exposes tools like `browser_navigate`, `browser_click`, `browser_type`, and `browser_snapshot` that Claude can call directly from conversations.
+This sets up a browser that Claude Code can control directly from your conversations. A visible browser window opens on your screen, and Claude navigates it, reads pages, clicks things, and types — just like you would, but hands-free.
 
 ```
-You (natural language) → Claude Code (reasoning) → Playwright MCP (browser control) → Website
+You (natural language) → Claude Code → Browser → Website
 ```
 
-The browser runs in **headed mode** (visible window) with a **persistent profile**, so:
-- You can see everything Claude does in real-time
-- You log in once per site and sessions persist across restarts
+- You can **watch everything** Claude does in real-time
+- You **log in once** per site and sessions persist across restarts
 - You handle CAPTCHAs/2FA manually, then Claude takes over
 
-### Architecture Decision: Why Playwright MCP Over browser-use?
+## What Can It Do?
 
-We evaluated several options:
-
-| Tool | Requires API Key? | Claude Integration | Best For |
-|------|-------------------|-------------------|----------|
-| **Playwright MCP** | No | Native MCP | Claude Max/Pro users |
-| browser-use | Yes (LLM API key) | MCP or Python | API users with own key |
-| Pinchtab | No | None (HTTP API) | Custom agent builders |
-| Claude Computer Use | No (but API-only) | Native | API users, non-browser tasks |
-
-**Playwright MCP won** because:
-1. No separate LLM API key needed — Claude Code IS the brain
-2. First-class MCP support by Microsoft — actively maintained
-3. Accessibility-tree-based (fast, cheap on tokens) vs screenshot-based (slow, expensive)
-4. Works with Claude Max/Pro subscriptions, not just API billing
+- **Browse** any website — navigate, scroll, go back
+- **Read** pages — articles, feeds, dashboards, search results
+- **Click** buttons, links, menus, and interactive elements
+- **Type** into forms, search bars, text areas, compose boxes
+- **Extract** data from pages into structured formats
+- **Post** content on social media (with your confirmation)
+- **Fill out** forms across multiple fields
+- **Manage tabs** — open, close, switch between them
+- **Upload files** to file inputs
+- **Take screenshots** for visual verification
 
 ## Prerequisites
 
-- **Claude Code** installed and authenticated
-- **Node.js** (v18+) with npm/npx
-- **Microsoft Edge** or **Google Chrome** installed
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
+- [Node.js](https://nodejs.org) v18+ (comes with npx)
+- **Microsoft Edge** or **Google Chrome**
 - Windows 10/11, macOS, or Linux
 
 ## Quick Start
 
-### 1. Install the Playwright MCP server
+### Option A: Run the installer (Windows)
 
-```bash
-claude mcp add -s user playwright -- npx @playwright/mcp@latest --user-data-dir ~/.playwright-mcp-profile
+```powershell
+git clone https://github.com/gokuafrica/claude-browser-agent.git
+cd claude-browser-agent
+powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-If you use **Edge** (no Chrome installed):
+The installer auto-detects your browser, configures everything, and installs the skill.
+
+### Option B: Manual setup
+
+**1. Register the browser server with Claude Code:**
+
 ```bash
+# If you have Google Chrome:
+claude mcp add -s user playwright -- npx @playwright/mcp@latest --user-data-dir ~/.playwright-mcp-profile
+
+# If you use Microsoft Edge instead:
 claude mcp add -s user playwright -- npx @playwright/mcp@latest --browser msedge --user-data-dir ~/.playwright-mcp-profile
 ```
 
-### 2. Restart Claude Code
-
-The MCP server initializes at session start. Restart Claude Code to activate it.
-
-### 3. Install the skill (optional)
-
-Copy the skill file to your Claude skills directory:
+**2. Install the skill (optional but recommended):**
 
 ```bash
 # Windows
@@ -70,33 +70,26 @@ mkdir -p ~/.claude/skills/claude-browser-agent
 cp skill/SKILL.md ~/.claude/skills/claude-browser-agent/SKILL.md
 ```
 
-### 4. Test it
+**3. Restart Claude Code** to activate.
 
-In Claude Code, try:
+**4. Try it out:**
+
 - "Open google.com"
-- "Navigate to x.com and show me my feed"
-- "Go to reddit.com and read the top posts on r/technology"
+- "Go to x.com and show me my feed"
+- "Read the top posts on reddit"
 
-## What Claude Can Do With This
+## Logging In to Sites
 
-- **Navigate** to any URL
-- **Read** page content via accessibility tree snapshots
-- **Click** buttons, links, and interactive elements
-- **Type** into forms, search bars, text areas
-- **Extract** structured data from pages (via JavaScript evaluation)
-- **Take screenshots** for visual verification
-- **Manage tabs** (open, close, switch)
-- **Upload files** to file inputs
-- **Wait** for elements to appear or disappear
+The browser Claude controls is **separate from your regular browser** — it has its own profile, so you'll need to log in to your accounts the first time.
 
-## Session Persistence
+1. Ask Claude to open the site (e.g., "open twitter.com")
+2. A browser window appears on your screen
+3. Click "Sign in" and enter your credentials **directly in the browser window**
+4. Once logged in, Claude takes over
 
-Your browser profile is stored at `~/.playwright-mcp-profile`. This means:
-- Cookies and login sessions survive across Claude Code restarts
-- Site preferences and settings are remembered
-- You only need to log in once per website
+Your sessions persist at `~/.playwright-mcp-profile`, so you only log in once per site.
 
-To reset the profile (clear all sessions):
+To clear all saved sessions:
 ```bash
 # Windows
 rmdir /s %USERPROFILE%\.playwright-mcp-profile
@@ -105,58 +98,48 @@ rmdir /s %USERPROFILE%\.playwright-mcp-profile
 rm -rf ~/.playwright-mcp-profile
 ```
 
-## Configuration Options
+## Configuration
 
-The Playwright MCP server supports many flags. Common ones:
+You can customize the browser behavior by modifying the MCP server flags. Remove the existing server and re-add with new flags:
 
 ```bash
-# Use a specific browser
---browser msedge          # Microsoft Edge
---browser chrome          # Google Chrome
---browser firefox         # Firefox
---browser webkit          # WebKit/Safari
-
-# Run headless (no visible window)
---headless
-
-# Set viewport size
---viewport-size 1920x1080
-
-# Emulate a device
---device "iPhone 15"
-
-# Ignore HTTPS errors (useful for local dev)
---ignore-https-errors
-
-# Save session traces for debugging
---save-trace
+claude mcp remove playwright
+claude mcp add -s user playwright -- npx @playwright/mcp@latest [flags] --user-data-dir ~/.playwright-mcp-profile
 ```
+
+Common flags:
+
+| Flag | What it does |
+|------|-------------|
+| `--browser msedge` | Use Edge instead of Chrome |
+| `--browser firefox` | Use Firefox |
+| `--headless` | Run without a visible window |
+| `--viewport-size 1920x1080` | Set the browser window size |
+| `--device "iPhone 15"` | Emulate a mobile device |
+| `--save-trace` | Save session traces for debugging |
 
 ## Limitations
 
-- **CAPTCHAs and 2FA**: Claude cannot solve these — you handle them manually in the visible browser window
-- **Anti-bot detection**: Some sites detect automation. The headed mode with a persistent profile helps, but aggressive anti-bot systems may still block access
-- **Shadow DOM**: Some modern web frameworks hide elements inside Shadow DOM roots that the accessibility tree can't reach
-- **Rate limits**: Websites may rate-limit automated interactions
-- **Platform ToS**: Automating actions on social media may violate their terms of service. Use responsibly.
+- **CAPTCHAs and 2FA** — Claude can't solve these. You handle them in the browser window.
+- **Anti-bot detection** — Some sites block automation. The visible browser with a persistent profile helps, but aggressive systems may still flag you.
+- **Shadow DOM** — Some modern sites hide elements in ways Claude can't always see. Claude falls back to screenshots when this happens.
+- **Platform ToS** — Automating social media may violate terms of service. Use responsibly.
 
 ## Troubleshooting
 
 **"Chromium distribution not found"**
 ```bash
-# Install the browser Playwright needs
 npx playwright install chrome
-# Or use Edge instead (--browser msedge)
+# Or switch to Edge: --browser msedge
 ```
 
-**MCP server shows "Failed to connect"**
-- Restart Claude Code — MCP servers initialize at session start
-- Check that npx is available: `npx --version`
+**"Failed to connect"**
+- Restart Claude Code — the browser server starts when Claude Code starts
+- Verify npx works: `npx --version`
 
-**Browser opens but Claude can't interact**
-- The page may still be loading — Claude waits automatically
-- Shadow DOM elements may be invisible to the accessibility tree
-- Try `browser_take_screenshot` to see what Claude sees
+**Browser opens but nothing happens**
+- The page may still be loading — give it a few seconds
+- Ask Claude to take a screenshot to see the current state
 
 ## License
 

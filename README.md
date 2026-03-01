@@ -2,6 +2,16 @@
 
 Give Claude Code the ability to control a real browser — navigate websites, read feeds, fill forms, click buttons, and post content.
 
+## Easiest Way to Install
+
+Just open Claude Code, point it to this repo, and ask it to install:
+
+```
+Clone https://github.com/gokuafrica/claude-browser-agent and install it
+```
+
+Claude will read this README, run the installer, and set everything up for you. Restart Claude Code when it's done.
+
 ## How It Works
 
 This sets up a browser that Claude Code can control directly from your conversations. A visible browser window opens on your screen, and Claude navigates it, reads pages, clicks things, and types — just like you would, but hands-free.

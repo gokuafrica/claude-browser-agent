@@ -16,9 +16,14 @@ Write-Host "`n=== Claude Browser Agent Installer ===" -ForegroundColor Cyan
 # Step 1: Check prerequisites
 Write-Host "`n[1/4] Checking prerequisites..." -ForegroundColor Yellow
 
-# Check Node.js
+# Check Node.js v18+
 try {
     $nodeVersion = & node --version 2>&1
+    $nodeMajor = [int](& node -e "process.stdout.write(String(parseInt(process.version.slice(1))))" 2>&1)
+    if ($nodeMajor -lt 18) {
+        Write-Host "  ERROR: Node.js v18+ required (found $nodeVersion). Install from https://nodejs.org" -ForegroundColor Red
+        exit 1
+    }
     Write-Host "  Node.js: $nodeVersion" -ForegroundColor Green
 } catch {
     Write-Host "  ERROR: Node.js not found. Install from https://nodejs.org" -ForegroundColor Red
@@ -34,44 +39,79 @@ try {
     exit 1
 }
 
-# Step 2: Detect browser
-Write-Host "`n[2/4] Detecting browser..." -ForegroundColor Yellow
+# Step 2: Select browser
+Write-Host "`n[2/4] Selecting browser..." -ForegroundColor Yellow
+
+# Helper: check if any of the given paths exist
+function Find-Browser($paths) {
+    foreach ($p in $paths) { if (Test-Path $p) { return $true } }
+    return $false
+}
+
+$chromeInstalled = Find-Browser @(
+    "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe",
+    "${env:ProgramFiles}\Google\Chrome\Application\chrome.exe",
+    "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe"
+)
+$edgeInstalled = Find-Browser @(
+    "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+    "${env:ProgramFiles}\Microsoft\Edge\Application\msedge.exe"
+)
+$firefoxInstalled = Find-Browser @(
+    "${env:ProgramFiles}\Mozilla Firefox\firefox.exe",
+    "${env:ProgramFiles(x86)}\Mozilla Firefox\firefox.exe"
+)
+
+# Build list of available browsers
+$availBrowsers = @()
+if ($chromeInstalled)  { $availBrowsers += @{ Key="chrome";  Label="Google Chrome";   Flag="" } }
+if ($edgeInstalled)    { $availBrowsers += @{ Key="msedge";  Label="Microsoft Edge";  Flag="--browser msedge" } }
+if ($firefoxInstalled) { $availBrowsers += @{ Key="firefox"; Label="Firefox";         Flag="--browser firefox" } }
 
 $BrowserFlag = ""
-if ($Browser -eq "auto") {
-    $chromePath = "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
-    $chromeProgFiles = "${env:ProgramFiles}\Google\Chrome\Application\chrome.exe"
-    $chromeProgFilesX86 = "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe"
-    $edgePath = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
-    $edgeProgFiles = "${env:ProgramFiles}\Microsoft\Edge\Application\msedge.exe"
 
-    if (Test-Path $chromePath) {
-        Write-Host "  Found: Google Chrome (local)" -ForegroundColor Green
-    } elseif (Test-Path $chromeProgFiles) {
-        Write-Host "  Found: Google Chrome (Program Files)" -ForegroundColor Green
-    } elseif (Test-Path $chromeProgFilesX86) {
-        Write-Host "  Found: Google Chrome (Program Files x86)" -ForegroundColor Green
-    } elseif (Test-Path $edgePath) {
-        Write-Host "  Found: Microsoft Edge" -ForegroundColor Green
-        $BrowserFlag = "--browser msedge"
-    } elseif (Test-Path $edgeProgFiles) {
-        Write-Host "  Found: Microsoft Edge" -ForegroundColor Green
-        $BrowserFlag = "--browser msedge"
-    } else {
-        Write-Host "  ERROR: No supported browser found. Install Chrome or Edge." -ForegroundColor Red
+if ($Browser -eq "auto") {
+    # Interactive prompt — show only browsers that are actually installed
+    if ($availBrowsers.Count -eq 0) {
+        Write-Host "  ERROR: No supported browser found." -ForegroundColor Red
+        Write-Host "  Install Chrome: https://www.google.com/chrome" -ForegroundColor Red
+        Write-Host "  Install Edge:   pre-installed on Windows 10/11" -ForegroundColor Red
         exit 1
     }
-} elseif ($Browser -eq "edge") {
-    $BrowserFlag = "--browser msedge"
-    Write-Host "  Using: Microsoft Edge (manual)" -ForegroundColor Green
-} elseif ($Browser -eq "chrome") {
-    Write-Host "  Using: Google Chrome (manual)" -ForegroundColor Green
-} elseif ($Browser -eq "firefox") {
-    $BrowserFlag = "--browser firefox"
-    Write-Host "  Using: Firefox (manual)" -ForegroundColor Green
+
+    Write-Host "  Browsers found on this system:" -ForegroundColor White
+    Write-Host ""
+    for ($i = 0; $i -lt $availBrowsers.Count; $i++) {
+        Write-Host "    [$($i+1)] $($availBrowsers[$i].Label)"
+    }
+    Write-Host ""
+
+    do {
+        $choice = Read-Host "  Enter number [1-$($availBrowsers.Count)]"
+        $valid = $choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availBrowsers.Count
+        if (-not $valid) {
+            Write-Host "  Invalid choice. Please enter a number between 1 and $($availBrowsers.Count)." -ForegroundColor Red
+        }
+    } while (-not $valid)
+
+    $selected = $availBrowsers[[int]$choice - 1]
+    $BrowserFlag = $selected.Flag
+    Write-Host "  Selected: $($selected.Label)" -ForegroundColor Green
+
 } else {
-    Write-Host "  ERROR: Unknown browser '$Browser'. Use: auto, chrome, edge, firefox" -ForegroundColor Red
-    exit 1
+    # --Browser flag was explicitly passed — validate it is supported and installed
+    $knownKeys = @("chrome", "msedge", "firefox")
+    if ($knownKeys -notcontains $Browser) {
+        Write-Host "  ERROR: Unknown browser '$Browser'. Supported values: chrome, msedge, firefox" -ForegroundColor Red
+        exit 1
+    }
+    $match = $availBrowsers | Where-Object { $_.Key -eq $Browser }
+    if (-not $match) {
+        Write-Host "  ERROR: '$Browser' is recognised but not installed on this system." -ForegroundColor Red
+        exit 1
+    }
+    $BrowserFlag = $match.Flag
+    Write-Host "  Using: $($match.Label) (from -Browser flag)" -ForegroundColor Green
 }
 
 # Step 3: Configure MCP server
@@ -85,10 +125,9 @@ if (-not (Test-Path $ProfileDir)) {
     Write-Host "  Profile directory exists: $ProfileDir" -ForegroundColor Green
 }
 
-# Remove existing MCP server if present
-try {
-    & claude mcp remove playwright 2>&1 | Out-Null
-} catch {}
+# Remove existing MCP server if present (try both user and local scope)
+try { & claude mcp remove playwright -s user 2>&1 | Out-Null } catch {}
+try { & claude mcp remove playwright        2>&1 | Out-Null } catch {}
 
 # Build MCP args
 $mcpArgs = @("@playwright/mcp@latest")

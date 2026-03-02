@@ -40,21 +40,42 @@ You (natural language) → Claude Code → Browser → Website
 ## Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
-- [Node.js](https://nodejs.org) v18+ (comes with npx)
-- **Microsoft Edge** or **Google Chrome**
+- [Node.js](https://nodejs.org) **v18+** (comes with npx) — older versions will not work
+- **Google Chrome**, **Microsoft Edge**, or **Firefox**
 - Windows 10/11, macOS, or Linux
 
 ## Quick Start
 
-### Option A: Run the installer (Windows)
+### Option A: Run the installer
 
+**macOS / Linux**
+```bash
+git clone https://github.com/gokuafrica/claude-browser-agent.git
+cd claude-browser-agent
+bash install.sh
+```
+
+**Windows**
 ```powershell
 git clone https://github.com/gokuafrica/claude-browser-agent.git
 cd claude-browser-agent
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-The installer auto-detects your browser, configures everything, and installs the skill.
+Both installers detect which supported browsers are installed on your system, ask you to pick one, configure everything, and install the skill. Restart Claude Code when done.
+
+**Skip the browser prompt** by passing `--browser` directly:
+```bash
+# macOS/Linux
+bash install.sh --browser chrome
+bash install.sh --browser firefox
+bash install.sh --browser msedge
+
+# Windows
+powershell -ExecutionPolicy Bypass -File install.ps1 -Browser chrome
+powershell -ExecutionPolicy Bypass -File install.ps1 -Browser msedge
+powershell -ExecutionPolicy Bypass -File install.ps1 -Browser firefox
+```
 
 ### Option B: Manual setup
 

@@ -44,6 +44,15 @@ with a persistent profile — logins and sessions survive across restarts.
 
 ## Standard Workflow
 
+### Session Init (ALWAYS do this first)
+Before any browser task, clean up stale tabs so only one working tab remains:
+```
+1. browser_tabs → list all open tabs
+2. Close all tabs except tab 0 (loop from highest index down using browser_tabs close)
+3. If tab 0 is not about:blank, navigate it to about:blank
+4. Now proceed with the actual task on this single clean tab
+```
+
 ### Opening a Site
 ```
 1. browser_navigate → target URL
